@@ -1,0 +1,129 @@
+---
+title: "Classification Project"
+author: "Uthpala Perera"
+date: "Thursday, November 12, 2015"
+output: html_document
+---
+
+
+This paper makes use of Weight lifting exercise data set from  (http://groupware.les.inf.puc-rio.br/har)
+in order to classify/predict each activity performance into one of 5 classes by using the other variables in the dataset.
+
+```{r,echo=FALSE,message=FALSE}
+library(ggplot2)
+library(dplyr)
+library(caret)
+
+```
+
+
+Read the training and test datasets
+
+```{r,cache=TRUE}
+
+data <- read.csv("c:/temp/coursework-mlearning/pml-training.csv")
+final <- read.csv("c:/temp/coursework-mlearning/pml-testing.csv")
+
+```
+
+##Data Exploration 
+
+A quick first look at the data set with functions such as summary and View shows a lot variables with many of missing values. We will first remove data columns with over 90% missing values. We will also remove variables such as names, time stamps and row labels as including them will be misleading for the decision.
+
+
+```{r}
+#get the list of columns with over 90% blanks
+count.blanks <- function(x){sum(x== "")/length(x)}
+blanks <- apply(data,2, count.blanks)
+exnames <- names(data)[blanks > .90]
+exlist <- exnames[!is.na(exnames)]
+#get the list of columns with over 90% NAs
+count.nas <- function(x){sum(is.na(x))/length(x)}
+nas <- apply(data,2, count.nas)
+nanames <- names(data)[nas > .90]
+nalist <- nanames[!is.na(nanames)]
+rmlist <- append(exlist, nalist)
+tmlist <- grep("time", names(data),value=TRUE)
+rmlist <- append(rmlist, tmlist)
+rmlist[length(rmlist)+1] <- "X"
+rmlist[length(rmlist)+1] <- "user_name"
+rmlist[length(rmlist)+1] <- "num_window"
+rmlist[length(rmlist)+1] <- "new_window"
+newdata <- data[,!colnames(data)%in%rmlist]
+newfinal <- final[,!colnames(data)%in%rmlist]
+```
+
+
+Let us slice the cleaned training data into a training and validation set.
+
+
+```{r}
+library(caret)
+set.seed(9123)
+inTrain <- createDataPartition(y=newdata$classe, p=0.9, list=FALSE)
+training <- newdata[inTrain,]
+validation <- newdata[-inTrain,]
+```
+
+In the following a random forest classification model is fitted to the cleaned training set toidentify the most important predictors
+
+```{r,cache=TRUE,message=FALSE}
+library(doParallel)
+registerDoParallel()
+set.seed(1224)
+testmod <- train(classe ~ ., training, method="rf")
+
+```
+
+Let us now find the 20 most important predictors
+
+```{r}
+vimp <-varImp(testmod)
+plot(vimp,top=20)
+```
+
+
+```{r,echo=FALSE}
+tst <- vimp$importance
+tst <- add_rownames(tst)
+test <- arrange(tst,desc(Overall))
+cols <- test$rowname[1:20]
+cols[21] <- "classe"
+fintrain <- training[,cols]  
+
+```
+
+Let us now fit a model with just these 20 most important predictors
+
+
+```{r,cache=TRUE}
+set.seed(1334)
+fit <- train(classe~., fintrain, method = "rf")
+
+```
+
+The following is an estimate of out of sample error rate using the validation set. 
+
+```{r}
+pred <- predict(fit, validation)
+predright = pred == validation$classe
+(length(pred)- sum(predright))/length(pred)
+```
+
+The two plot of predictions for the validation-set below shows that the missclassifications are in the right top most cluster where all five classes are intermixed with few clear boundaries. 
+
+```{r}
+qplot(roll_belt,yaw_belt,data=validation,color= predright,main="Validation Predictions")
+qplot(roll_belt,yaw_belt,data=validation,color=classe)
+```
+
+The prediction for the test set is as follows:
+
+```{r}
+predict(fit, newfinal)
+
+```
+
+
+
+
