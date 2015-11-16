@@ -5,9 +5,9 @@ date: "Thursday, November 12, 2015"
 output: html_document
 ---
 
+This paper investigates what would be a good classification model for human resouce activity measurements obtained from http://groupware.les.inf.puc-rio.br/har . The measurements are obtained from six participents performing a weight lifting exercise in 5 deliberate ways which we seek to  classify/predict.
 
-This paper makes use of Weight lifting exercise data set from  (http://groupware.les.inf.puc-rio.br/har)
-in order to classify/predict each activity performance into one of 5 classes by using the other variables in the dataset.
+
 
 ```{r,echo=FALSE,message=FALSE}
 library(ggplot2)
@@ -17,7 +17,7 @@ library(caret)
 ```
 
 
-Read the training and test datasets
+We begin by reading the training and test datasets
 
 ```{r,cache=TRUE}
 
@@ -26,9 +26,9 @@ final <- read.csv("c:/temp/coursework-mlearning/pml-testing.csv")
 
 ```
 
-##Data Exploration 
+##Data Exploration and Cleaning
 
-A quick first look at the data set with functions such as summary and View shows a lot variables with many of missing values. We will first remove data columns with over 90% missing values. We will also remove variables such as names, time stamps and row labels as including them will be misleading for the decision.
+A quick, first look, at the data set with R functions such as summary and View shows a lot of variables with many missing values. Those with over 90% missing values will be removed. Variables such as names, time stamps and row labels will be removed from the model as including them will be misleading for the decision.
 
 
 ```{r}
@@ -54,7 +54,7 @@ newfinal <- final[,!colnames(data)%in%rmlist]
 ```
 
 
-Let us slice the cleaned training data into a training and validation set.
+The following will  slice the cleaned training data into a training and validation set.
 
 
 ```{r}
@@ -65,7 +65,8 @@ training <- newdata[inTrain,]
 validation <- newdata[-inTrain,]
 ```
 
-In the following a random forest classification model is fitted to the cleaned training set toidentify the most important predictors
+We shall explore the training set with a Random Forest prediction model as they are known to perform well with a large number of variables as in this case.
+
 
 ```{r,cache=TRUE,message=FALSE}
 library(doParallel)
@@ -77,7 +78,7 @@ testmod <- train(classe ~ ., training, method="rf")
 
 Let us now find the 20 most important predictors
 
-```{r}
+```{r,message=FALSE}
 vimp <-varImp(testmod)
 plot(vimp,top=20)
 ```
@@ -93,7 +94,7 @@ fintrain <- training[,cols]
 
 ```
 
-Let us now fit a model with just these 20 most important predictors
+The initial model will be refined with just these 20 most important predictors
 
 
 ```{r,cache=TRUE}
@@ -102,7 +103,7 @@ fit <- train(classe~., fintrain, method = "rf")
 
 ```
 
-The following is an estimate of out of sample error rate using the validation set. 
+## Estimate the "of out of sample error rate"  using the validation set. 
 
 ```{r}
 pred <- predict(fit, validation)
@@ -110,12 +111,17 @@ predright = pred == validation$classe
 (length(pred)- sum(predright))/length(pred)
 ```
 
-The two plot of predictions for the validation-set below shows that the missclassifications are in the right top most cluster where all five classes are intermixed with few clear boundaries. 
+Let us look at the following two plots of predictions for the validation-set where the missclassifications are. They are explained by the  right top most cluster where all five classes are intermixed with few clear boundaries . 
 
 ```{r}
 qplot(roll_belt,yaw_belt,data=validation,color= predright,main="Validation Predictions")
 qplot(roll_belt,yaw_belt,data=validation,color=classe)
 ```
+
+##Conclusion
+
+The estimated out of sample error rate is 0.8% for a classification model of Random Forests with 20 predictors. We shall choose this as a suitable model for predicting the test set.
+
 
 The prediction for the test set is as follows:
 
